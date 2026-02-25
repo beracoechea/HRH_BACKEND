@@ -2,11 +2,10 @@ const express = require('express');
 const router = express.Router();
 const BD = require('../models/GenericModel');
 
-// 🔒 SEGURIDAD: Solo estas tablas pueden ser consultadas desde el front
 const ALLOWED_TABLES = ['appointments', 'chatbot_knowledge'];
 
 router.get('/chat/search', async (req, res) => {
-  const { q } = req.query; // El texto del usuario viene como ?q=hola
+  const { q } = req.query;
   if (!q) return res.json([]);
 
   try {

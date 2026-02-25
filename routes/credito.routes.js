@@ -5,16 +5,8 @@ const creditosController = require('../controllers/creditos.controller');
 // IMPORTAMOS TUS MIDDLEWARES DE SEGURIDAD
 const { protect, adminOnly } = require('../middleware/authMiddleware');
 
-/**
- * 👤 RUTA DE USUARIO: Solicitar crédito
- * Cualquier usuario logueado puede enviar una solicitud.
- */
 router.post('/solicitar', protect, creditosController.crearSolicitud);
 
-/**
- * 🔐 RUTAS ADMINISTRATIVAS: Gestión financiera
- * Estos endpoints solo deben ser accesibles por el Administrador.
- */
 
 // Ver todos los créditos del sistema
 router.get('/todos', protect, adminOnly, creditosController.obtenerTodos);

@@ -1,6 +1,4 @@
 const multer = require('multer');
-
-// Usamos almacenamiento en memoria porque vamos a subir el buffer directamente a Google Drive
 const storage = multer.memoryStorage();
 
 const upload = multer({
@@ -9,7 +7,6 @@ const upload = multer({
         fileSize: 5 * 1024 * 1024 // Límite de 5MB
     },
     fileFilter: (req, file, cb) => {
-        // Aceptamos solo imágenes y PDFs
         if (file.mimetype === "application/pdf" || 
             file.mimetype === "image/jpeg" || 
             file.mimetype === "image/png") {

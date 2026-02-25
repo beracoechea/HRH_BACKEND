@@ -35,8 +35,6 @@ const authorize = (rolesPermitidos) => {
     };
 };
 
-// ALIAS PARA RETROCOMPATIBILIDAD: 
-// Si se usa adminOnly sin parámetros, solo deja pasar al admin.
 const adminOnly = authorize([ROLES.ADMIN]);
 
 module.exports = { protect, authorize, adminOnly };

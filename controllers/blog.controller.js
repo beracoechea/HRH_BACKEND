@@ -3,7 +3,6 @@ const { rawQuery } = require('../db');
 
 exports.getBlogsAdmin = async (req, res) => {
     try {
-        // Como BD.findAll ya no existe, usamos un SELECT simple
         const blogs = await rawQuery("SELECT * FROM blogs ORDER BY id DESC");
         res.json(blogs);
     } catch (err) {
@@ -14,7 +13,7 @@ exports.getBlogsAdmin = async (req, res) => {
 exports.getBlogsPublic = async (req, res) => {
     try {
         const sql = "SELECT * FROM blogs WHERE activa = 1 ORDER BY fecha_publicacion DESC";
-        const blogs = await rawQuery(sql); // Quitar el "BD."
+        const blogs = await rawQuery(sql);
         res.json(blogs);
     } catch (err) {
         res.status(500).json({ error: "Error al cargar noticias" });

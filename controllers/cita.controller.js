@@ -1,5 +1,5 @@
 /* src/controllers/cita.controller.js */
-const { rawQuery } = require('../db'); // Cambiar importación
+const { rawQuery } = require('../db');
 const { authClient, calendar } = require('../config/googleAuth');
 
 exports.crearCita = async (req, res) => {
@@ -26,11 +26,9 @@ exports.confirmarCita = async (req, res) => {
         const admins = await rawQuery("SELECT email FROM usuarios WHERE rol = 'admin'");
         const adminEmails = admins.map(a => ({ email: a.email }));
 
-        // ... Lógica de Google Calendar (se mantiene igual) ...
         const fechaLimpia = new Date(cita.fecha).toISOString().split('T')[0];
         const startDateTime = `${fechaLimpia}T${cita.horario}`;
         
-        // (Asumiendo que el resto del código de tiempo está bien)
         const [horas, minutos] = cita.horario.split(':');
         const endObj = new Date(2000, 0, 1, parseInt(horas), parseInt(minutos));
         endObj.setMinutes(endObj.getMinutes() + 45);
@@ -53,7 +51,6 @@ exports.confirmarCita = async (req, res) => {
             sendUpdates: 'all',
         });
 
-        // Cambio aquí: Quitar el "BD."
         await rawQuery(
             "UPDATE citas SET estatus = 'confirmada', google_event_id = ? WHERE id = ?", 
             [response.data.id, id]

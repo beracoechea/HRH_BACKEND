@@ -10,29 +10,26 @@ exports.crearSolicitud = async (req, res) => {
             pago_mensual_ano1, pago_mensual_ano2, telefono_contacto 
         } = req.body;
 
-        // 🛡️ USAMOS LAS CONSTANTES GLOBALES
         const tipoKey = tipo_credito?.toUpperCase() || 'PERSONAL';
         const docsRequeridos = REQUISITOS_CREDITO[tipoKey] || REQUISITOS_CREDITO.PERSONAL;
 
-        // 1. INSERTAR EL CRÉDITO (Usamos ESTADOS_CREDITO.PENDIENTE en lugar de un string manual)
-        const sqlCredito = `INSERT INTO creditos 
-            (usuario_id, tipo_credito, monto_solicitado, plazo_meses, pago_mensual_ano1, pago_mensual_ano2, telefono_contacto, estado) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
-
-        const [result] = await pool.query(sqlCredito, [
-            usuario_id, 
-            tipoKey, 
+        // Insertar crédito
+        const [result] = await pool.query(
+            `INSERT INTO creditos 
+            (usuario_id, tipo_credito, 
             monto_solicitado, 
             plazo_meses, 
             pago_mensual_ano1, 
-            pago_mensual_ano2 || 0, 
-            telefono_contacto,
-            ESTADOS_CREDITO.PENDIENTE // <--- Evita errores de dedo
-        ]);
+            pago_mensual_ano2, 
+            telefono_contacto, 
+            estado) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [usuario_id, tipoKey, monto_solicitado, plazo_meses, pago_mensual_ano1, pago_mensual_ano2 || 0, telefono_contacto, ESTADOS_CREDITO.PENDIENTE]
+        );
 
         const nuevoCreditoId = result.insertId;
 
-        // 2. CREAR EXPEDIENTE ESPECÍFICO (Iteramos sobre la constante)
+        // Crear filas iniciales del expediente
         for (const nombreDoc of docsRequeridos) {
             await pool.query(
                 "INSERT INTO expedientes_credito (credito_id, tipo_documento, estatus, url_drive) VALUES (?, ?, 'esperando', '')",
@@ -40,19 +37,10 @@ exports.crearSolicitud = async (req, res) => {
             );
         }
 
-        // 3. ENVIAR CORREOS... (el resto del código sigue igual)
+        // Notificaciones (Email)
         const [[userData]] = await pool.query("SELECT nombre, email FROM usuarios WHERE id = ?", [usuario_id]);
-        
         if (userData) {
-            const dataEmail = {
-                nombre: userData.nombre,
-                email: userData.email,
-                monto: monto_solicitado,
-                plazo: plazo_meses,
-                tipo: tipoKey,
-                telefono: telefono_contacto
-            };
-
+            const dataEmail = { nombre: userData.nombre, email: userData.email, monto: monto_solicitado, tipo: tipoKey };
             const [admins] = await pool.query("SELECT email FROM usuarios WHERE rol = 'admin'");
             const adminList = admins.map(a => a.email).join(',');
             
@@ -60,14 +48,9 @@ exports.crearSolicitud = async (req, res) => {
             notifyUserConfirmation(dataEmail, docsRequeridos);
         }
 
-        res.status(201).json({ 
-            success: true, 
-            message: `Solicitud de crédito ${tipoKey} registrada.`,
-            creditoId: nuevoCreditoId 
-        });
+        res.status(201).json({ success: true, creditoId: nuevoCreditoId });
 
     } catch (error) {
-        console.error("Error:", error);
         res.status(500).json({ message: "Error al crear la solicitud" });
     }
 };
@@ -191,5 +174,60 @@ exports.obtenerEstadisticasIngresos = async (req, res) => {
     } catch (error) {
         console.error("❌ ERROR SQL ESTADISTICAS:", error);
         res.status(500).json([]);
+    }
+};
+exports.obtenerPorUsuario = async (req, res) => {
+    try {
+        // 1. Verificación de seguridad: ¿Existe el usuario en el request?
+        if (!req.user || !req.user.id) {
+            return res.status(401).json({ message: "Usuario no autenticado correctamente" });
+        }
+
+        const usuario_id = req.user.id;
+
+        // 2. Consulta de créditos
+        const [creditos] = await pool.query(
+            `SELECT c.*, u.email AS usuario_email, u.nombre AS usuario_nombre
+             FROM creditos c
+             JOIN usuarios u ON c.usuario_id = u.id
+             WHERE c.usuario_id = ?
+             ORDER BY c.fecha_solicitud DESC`, 
+            [usuario_id]
+        );
+
+        // 3. Obtener expedientes (OJO con el nombre de la tabla: expedientes_credito)
+        const data = await Promise.all(creditos.map(async (credito) => {
+            try {
+                const [docs] = await pool.query(
+                    `SELECT 
+                        id, 
+                        tipo_documento AS tipo, 
+                        tipo_documento, 
+                        LOWER(IFNULL(estatus, 'esperando')) AS estatus, 
+                        IFNULL(url_drive, '') AS url,
+                        url_drive,
+                        observaciones 
+                     FROM expedientes_credito 
+                     WHERE credito_id = ?`,
+                    [credito.id]
+                );
+
+                return {
+                    ...credito,
+                    expediente: docs 
+                };
+            } catch (sqlErr) {
+                console.error(`Error en docs del crédito ${credito.id}:`, sqlErr.message);
+                return { ...credito, expediente: [] }; // Fallback para que no muera todo
+            }
+        }));
+
+        res.json(data);
+    } catch (error) {
+        // ESTO ES VITAL: Mira tu terminal de Node/Nodemon cuando esto falle
+        res.status(500).json({ 
+            message: "Error interno al cargar información",
+            debug: error.message // Solo para desarrollo, quítalo en producción
+        });
     }
 };

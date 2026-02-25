@@ -28,4 +28,6 @@ router.put('/editar/:id', protect, adminOnly, creditosController.editarCredito);
 // Ver el gráfico de ingresos y recaudación
 router.get('/estadisticas-ingresos', protect, adminOnly, creditosController.obtenerEstadisticasIngresos);
 
+//Obtener por usuario
+router.get('/usuario', protect, creditosController.obtenerPorUsuario);
 module.exports = router;
